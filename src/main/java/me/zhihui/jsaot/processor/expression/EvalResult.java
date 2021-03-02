@@ -1,6 +1,6 @@
 package me.zhihui.jsaot.processor.expression;
 
-public class EvalResult {
+public class EvalResult implements Cloneable {
 
 	public enum EvalResultType {
 		LONG, FLOAT, STRING, BOOL
@@ -40,9 +40,32 @@ public class EvalResult {
 		return false;
 	}
 
+	public void increase() {
+		if (type == EvalResultType.LONG)
+			value = Long.valueOf(value.toString()) + 1;
+	}
+
+	public void decrease() {
+		if (type == EvalResultType.LONG)
+			value = Long.valueOf(value.toString()) - 1;
+	}
+
 	@Override
 	public String toString() {
 		return type + ":" + value;
+	}
+
+	@Override
+	public EvalResult clone() throws CloneNotSupportedException {
+		return (EvalResult) super.clone();
+	}
+
+	public EvalResult copy() {
+		try {
+			return clone();
+		} catch (CloneNotSupportedException e) {
+			return null;
+		}
 	}
 
 }

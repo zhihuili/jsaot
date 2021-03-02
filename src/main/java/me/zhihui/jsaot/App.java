@@ -50,6 +50,6 @@ public class App {
 				globals, globalSpace);
 		evalVisitor.visit(root);
 
-		log.debug("global space: " + globalSpace.toString());
+		log.info("global space: " + globalSpace.toString());
 	}
 }

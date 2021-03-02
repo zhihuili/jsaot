@@ -95,6 +95,13 @@ public class Operator {
 				} else {
 					r.setValue(false);
 				}
+			case ">":
+				if (Float.valueOf(a.getValue().toString()) > Float.valueOf(b
+						.getValue().toString())) {
+					r.setValue(true);
+				} else {
+					r.setValue(false);
+				}
 			}
 
 		}

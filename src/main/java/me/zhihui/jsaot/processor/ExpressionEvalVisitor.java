@@ -4,8 +4,11 @@ import java.util.Stack;
 
 import me.zhihui.jsaot.parser.JavaScriptLexer;
 import me.zhihui.jsaot.parser.JavaScriptParser;
+import me.zhihui.jsaot.parser.JavaScriptParser.AssignmentOperatorExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.MultiplicativeExpressionContext;
+import me.zhihui.jsaot.parser.JavaScriptParser.PostDecreaseExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.RelationalExpressionContext;
+import me.zhihui.jsaot.parser.JavaScriptParser.WhileStatementContext;
 import me.zhihui.jsaot.parser.JavaScriptParserBaseVisitor;
 import me.zhihui.jsaot.processor.expression.EvalResult;
 import me.zhihui.jsaot.processor.expression.Operator;
@@ -55,18 +58,19 @@ public class ExpressionEvalVisitor extends
 		String variableName = getIdentifier(ctx);
 		if (variableName != null) {
 			EvalResult r = visit(ctx.getChild(2));// ctx.getChild(1) is "="
-			storeMemory(variableName, r);
+			storeMemory(variableName, r.copy());
 		}
 		return null;
 	}
 
 	private void storeMemory(String id, EvalResult r) {
-		MemorySpace space = getSpaceWithSymbol(id);
-		if (space == null)
-			space = currentSpace; // create in current space
-		space.put(id, r); // store
+		currentSpace.put(id, r); // store
+		log.debug(currentSpace.toString());
 	}
 
+	/**
+	 * get left branch identifier
+	 */
 	private String getIdentifier(ParserRuleContext ctx) {
 		ParseTree child0 = ctx.getChild(0);
 		if (child0 instanceof JavaScriptParser.AssignableContext
@@ -105,19 +109,21 @@ public class ExpressionEvalVisitor extends
 			if (i < argsCount) {
 				ParseTree argNode = args.getChild(i + 1);
 				EvalResult value = visit(argNode);
-				fspace.put(parameter.getName(), value);
+				fspace.put(parameter.getName(), value.copy());
 				i++;
 			}
 		}
 
 		stack.push(fspace);
-		log.debug(fspace.toString());
+		log.debug("push:" + fspace.toString());
 		EvalResult result = null;
 		try {
 			visit(body);
 		} catch (ReturnValue rv) {
 			result = rv.value;
 		}
+		log.debug("pop:" + fspace.toString());
+
 		stack.pop();
 		currentSpace = saveSpace;
 		return result;
@@ -140,17 +146,32 @@ public class ExpressionEvalVisitor extends
 		throw sharedReturnValue;
 	}
 
+	/**
+	 * If '(' expressionSequence ')' statement (Else statement)?
+	 */
 	@Override
 	public EvalResult visitIfStatement(JavaScriptParser.IfStatementContext ctx) {
-		JavaScriptParser.ExpressionSequenceContext boolExpNode = ctx.getChild(
-				JavaScriptParser.ExpressionSequenceContext.class, 0);
-		boolean cond = (Boolean) visit(boolExpNode).getValue();
-		if (cond) {
-			JavaScriptParser.StatementContext statNode = ctx.getChild(
-					JavaScriptParser.StatementContext.class, 0);
-			visit(statNode);
-		}
+		processCondition(ctx);
+		// TODO else
 		return null;
+	}
+
+	private EvalResult processCondition(ParserRuleContext node) {
+		boolean cond = condition(node);
+		EvalResult er;
+		if (cond) {
+			JavaScriptParser.StatementContext statNode = node.getChild(
+					JavaScriptParser.StatementContext.class, 0);
+			er = visit(statNode);
+			return er == null ? new EvalResult() : er;
+		}
+		return null;// cond is false
+	}
+
+	private boolean condition(ParserRuleContext node) {
+		JavaScriptParser.ExpressionSequenceContext boolExpNode = node.getChild(
+				JavaScriptParser.ExpressionSequenceContext.class, 0);
+		return (Boolean) visit(boolExpNode).getValue();
 	}
 
 /**
@@ -255,6 +276,56 @@ public class ExpressionEvalVisitor extends
 		Object o = space.get(id);
 		if (o != null)
 			return (EvalResult) o;
+		return null;
+	}
+
+	/**
+	 * singleExpression {this.notLineTerminator()}? '--'
+	 */
+	@Override
+	public EvalResult visitPostDecreaseExpression(
+			PostDecreaseExpressionContext ctx) {
+		String id = getIdentifier(ctx);
+		if (id == null) {
+			return null;
+		}
+		EvalResult value = visit(ctx.getChild(0));// call visitIdentifier
+		value.decrease();
+		log.debug(currentSpace.toString());
+
+		return value;
+	}
+
+	/**
+	 * <assoc=right> singleExpression assignmentOperator singleExpression
+	 */
+	@Override
+	public EvalResult visitAssignmentOperatorExpression(
+			AssignmentOperatorExpressionContext ctx) {
+		String id = getIdentifier(ctx);
+		if (id == null)
+			return null;
+		String op = ctx.getChild(1).getText();
+		switch (op) {
+		case "*=":
+			currentSpace.put(
+					id,
+					Operator.multi(visit(ctx.getChild(0)),
+							visit(ctx.getChild(2))));
+		case "+=":
+			currentSpace.put(id, Operator.add(visit(ctx.getChild(0)),
+					visit(ctx.getChild(2))));
+		}
+		return null;
+	}
+
+	/**
+	 * While '(' expressionSequence ')' statement
+	 */
+	@Override
+	public EvalResult visitWhileStatement(WhileStatementContext ctx) {
+		if (processCondition(ctx) != null)
+			visitWhileStatement(ctx);
 		return null;
 	}
 
