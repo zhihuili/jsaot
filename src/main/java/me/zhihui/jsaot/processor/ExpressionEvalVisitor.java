@@ -109,7 +109,7 @@ public class ExpressionEvalVisitor extends
 		log.debug(fspace.toString());
 		EvalResult result = null;
 		try {
-			visit(body);
+			// visit(body);
 		} catch (ReturnValue rv) {
 			result = rv.value;
 		}
@@ -123,6 +123,26 @@ public class ExpressionEvalVisitor extends
 			return scopes.get(ctx);
 		return resolveScope(ctx.getParent());
 
+	}
+
+	@Override
+	public EvalResult visitReturnStatement(
+			JavaScriptParser.ReturnStatementContext ctx) {
+		sharedReturnValue.value = visit(ctx);
+		throw sharedReturnValue;
+	}
+
+	@Override
+	public EvalResult visitIfStatement(JavaScriptParser.IfStatementContext ctx) {
+		JavaScriptParser.ExpressionSequenceContext boolExpNode = ctx.getChild(
+				JavaScriptParser.ExpressionSequenceContext.class, 0);
+		boolean cond = (Boolean) visit(boolExpNode).getValue();
+		if (cond) {
+			JavaScriptParser.StatementContext statNode = ctx.getChild(
+					JavaScriptParser.StatementContext.class, 0);
+			visit(statNode);
+		}
+		return null;
 	}
 
 	@Override

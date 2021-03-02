@@ -27,19 +27,17 @@ public class App {
 	static Logger log = LoggerFactory.getLogger(App.class);
 
 	public static void main(String[] args) throws IOException {
-		String inputFile = null;
+		String inputFile = App.class.getClassLoader()
+				.getResource("sample/3.js").getPath();
 		if (args.length > 0)
 			inputFile = args[0];
-		InputStream is = System.in;
-		if (inputFile != null) {
-			is = new FileInputStream(inputFile);
-		}
+		InputStream is = new FileInputStream(inputFile);
 		Lexer lexer = new JavaScriptLexer(CharStreams.fromStream(is));
 		TokenStream tokenStream = new CommonTokenStream(lexer);
 		JavaScriptParser parser = new JavaScriptParser(tokenStream);
 		ProgramContext root = parser.program();
 
-//		Trees.inspect(root, parser);
+		// Trees.inspect(root, parser);
 
 		ParseTreeWalker walker = new ParseTreeWalker();
 		ParseTreeProperty<Scope> scopes = new ParseTreeProperty<Scope>();
