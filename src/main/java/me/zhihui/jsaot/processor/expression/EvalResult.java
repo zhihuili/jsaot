@@ -33,6 +33,13 @@ public class EvalResult {
 		this.value = value;
 	}
 
+	public boolean isNumber() {
+		if (type == EvalResultType.LONG || type == EvalResultType.FLOAT) {
+			return true;
+		}
+		return false;
+	}
+
 	@Override
 	public String toString() {
 		return type + ":" + value;

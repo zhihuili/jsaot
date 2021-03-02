@@ -1,6 +1,5 @@
-package me.zhihui.jsaot.processor;
+package me.zhihui.jsaot.processor.expression;
 
-import me.zhihui.jsaot.processor.expression.EvalResult;
 
 /***
  * Excerpted from "Language Implementation Patterns",

@@ -4,9 +4,12 @@ import java.util.Stack;
 
 import me.zhihui.jsaot.parser.JavaScriptLexer;
 import me.zhihui.jsaot.parser.JavaScriptParser;
+import me.zhihui.jsaot.parser.JavaScriptParser.MultiplicativeExpressionContext;
+import me.zhihui.jsaot.parser.JavaScriptParser.RelationalExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParserBaseVisitor;
 import me.zhihui.jsaot.processor.expression.EvalResult;
 import me.zhihui.jsaot.processor.expression.Operator;
+import me.zhihui.jsaot.processor.expression.ReturnValue;
 import me.zhihui.jsaot.symbol.FunctionSpace;
 import me.zhihui.jsaot.symbol.FunctionSymbol;
 import me.zhihui.jsaot.symbol.GlobalScope;
@@ -76,10 +79,12 @@ public class ExpressionEvalVisitor extends
 		return null;
 	}
 
-	@Override
 	/**
 	 * call function
+	 * 
+	 * singleExpression arguments # ArgumentsExpression
 	 */
+	@Override
 	public EvalResult visitArgumentsExpression(
 			JavaScriptParser.ArgumentsExpressionContext ctx) {
 		String id = getIdentifier(ctx);
@@ -109,7 +114,7 @@ public class ExpressionEvalVisitor extends
 		log.debug(fspace.toString());
 		EvalResult result = null;
 		try {
-			// visit(body);
+			visit(body);
 		} catch (ReturnValue rv) {
 			result = rv.value;
 		}
@@ -125,10 +130,13 @@ public class ExpressionEvalVisitor extends
 
 	}
 
+	/**
+	 * return by throw error
+	 */
 	@Override
 	public EvalResult visitReturnStatement(
 			JavaScriptParser.ReturnStatementContext ctx) {
-		sharedReturnValue.value = visit(ctx);
+		sharedReturnValue.value = visit(ctx.getChild(1));
 		throw sharedReturnValue;
 	}
 
@@ -145,10 +153,21 @@ public class ExpressionEvalVisitor extends
 		return null;
 	}
 
+/**
+ * singleExpression ('<' | '>' | '<=' | '>=') singleExpression 
+ */
 	@Override
+	public EvalResult visitRelationalExpression(RelationalExpressionContext ctx) {
+		EvalResult a = visit(ctx.getChild(0));
+		EvalResult b = visit(ctx.getChild(2));
+		String op = ctx.getChild(1).getText();
+		return Operator.relational(op, a, b);
+	}
+
 	/**
-	 * (+|- a b)
+	 * singleExpression ('+' | '-') singleExpression
 	 */
+	@Override
 	public EvalResult visitAdditiveExpression(
 			JavaScriptParser.AdditiveExpressionContext ctx) {
 
@@ -158,8 +177,37 @@ public class ExpressionEvalVisitor extends
 		if ("+".equals(ctx.getChild(1).getText())) {
 			r = Operator.add(a, b);
 
+		} else {
+			r = Operator.minus(a, b);
+
 		}
 		log.debug("Additive:" + r);
+		return r;
+
+	}
+
+	/**
+	 * singleExpression ('*' | '/' | '%') singleExpression
+	 */
+	public EvalResult visitMultiplicativeExpression(
+			MultiplicativeExpressionContext ctx) {
+
+		EvalResult a = visit(ctx.getChild(0));
+		EvalResult b = visit(ctx.getChild(2));
+		String op = ctx.getChild(1).getText();
+		EvalResult r = null;
+		if ("*".equals(op)) {
+			r = Operator.multi(a, b);
+
+		} else if ("/".equals(op)) {
+			r = Operator.divide(a, b);
+
+		}
+		if ("%".equals(op)) {
+			r = Operator.mod(a, b);
+
+		}
+		log.debug("Multi:" + r);
 		return r;
 
 	}
