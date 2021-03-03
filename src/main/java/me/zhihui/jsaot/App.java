@@ -32,6 +32,10 @@ public class App {
 		if (args.length > 0)
 			inputFile = args[0];
 		InputStream is = new FileInputStream(inputFile);
+		input(is);
+	}
+
+	public static void input(InputStream is) throws IOException {
 		Lexer lexer = new JavaScriptLexer(CharStreams.fromStream(is));
 		TokenStream tokenStream = new CommonTokenStream(lexer);
 		JavaScriptParser parser = new JavaScriptParser(tokenStream);
@@ -45,11 +49,24 @@ public class App {
 		MemorySpace globalSpace = new MemorySpace("global");
 		DeclProcessor def = new DeclProcessor(scopes, globals);
 		walker.walk(def, root);
+		printLine();
 
 		ExpressionEvalVisitor evalVisitor = new ExpressionEvalVisitor(scopes,
 				globals, globalSpace);
 		evalVisitor.visit(root);
 
 		log.info("global space: " + globalSpace.toString());
+		printLine();
+		output(root);
+	}
+
+	private static void output(ProgramContext t) {
+		String code = t.getText();
+		int l = code.length();
+		System.out.println(code.substring(0, l - 5));// rm <EOF>
+	}
+
+	private static void printLine() {
+		log.debug("==============================================================================================");
 	}
 }

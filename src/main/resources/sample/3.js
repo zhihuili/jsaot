@@ -8,6 +8,7 @@ var y = "7" + 8;
 x = x + y;
 var z = 5;
 var m = fw(z);
+var n = f(z);
 function fw(z) {
 	var x = 1;
 	while (z > 1) {

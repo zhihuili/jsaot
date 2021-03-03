@@ -88,6 +88,7 @@ public class Operator {
 				} else {
 					r.setValue(false);
 				}
+				break;
 			case "<=":
 				if (Float.valueOf(a.getValue().toString()) <= Float.valueOf(b
 						.getValue().toString())) {
@@ -95,6 +96,7 @@ public class Operator {
 				} else {
 					r.setValue(false);
 				}
+				break;
 			case ">":
 				if (Float.valueOf(a.getValue().toString()) > Float.valueOf(b
 						.getValue().toString())) {
@@ -102,6 +104,7 @@ public class Operator {
 				} else {
 					r.setValue(false);
 				}
+				break;
 			}
 
 		}

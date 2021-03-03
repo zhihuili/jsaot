@@ -1,16 +1,25 @@
 package me.zhihui.jsaot.processor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 import me.zhihui.jsaot.parser.JavaScriptLexer;
 import me.zhihui.jsaot.parser.JavaScriptParser;
+import me.zhihui.jsaot.parser.JavaScriptParser.AnoymousFunctionDeclContext;
+import me.zhihui.jsaot.parser.JavaScriptParser.ArgumentContext;
+import me.zhihui.jsaot.parser.JavaScriptParser.ArrayElementContext;
+import me.zhihui.jsaot.parser.JavaScriptParser.ArrayLiteralExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.AssignmentOperatorExpressionContext;
+import me.zhihui.jsaot.parser.JavaScriptParser.FunctionExpressionContext;
+import me.zhihui.jsaot.parser.JavaScriptParser.IdentifierExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.MultiplicativeExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.PostDecreaseExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.RelationalExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.WhileStatementContext;
 import me.zhihui.jsaot.parser.JavaScriptParserBaseVisitor;
 import me.zhihui.jsaot.processor.expression.EvalResult;
+import me.zhihui.jsaot.processor.expression.EvalResult.EvalResultType;
 import me.zhihui.jsaot.processor.expression.Operator;
 import me.zhihui.jsaot.processor.expression.ReturnValue;
 import me.zhihui.jsaot.symbol.FunctionSpace;
@@ -58,7 +67,7 @@ public class ExpressionEvalVisitor extends
 		String variableName = getIdentifier(ctx);
 		if (variableName != null) {
 			EvalResult r = visit(ctx.getChild(2));// ctx.getChild(1) is "="
-			storeMemory(variableName, r.copy());
+			storeMemory(variableName, r.value());
 		}
 		return null;
 	}
@@ -91,9 +100,20 @@ public class ExpressionEvalVisitor extends
 	@Override
 	public EvalResult visitArgumentsExpression(
 			JavaScriptParser.ArgumentsExpressionContext ctx) {
-		String id = getIdentifier(ctx);
-		FunctionSymbol fs = (FunctionSymbol) resolveScope(ctx).resolve(id);
-		JavaScriptParser.FunctionDeclarationContext functionRoot = fs.getAst();
+		ParserRuleContext left = (ParserRuleContext) ctx.getChild(0);
+		FunctionSymbol fs = null;
+		ParserRuleContext functionRoot = null;
+		if (left instanceof FunctionExpressionContext) {
+			functionRoot = (ParserRuleContext) left.getChild(0);
+			fs = (FunctionSymbol) scopes.get(functionRoot);
+		} else if (left instanceof IdentifierExpressionContext) {
+			String id = getIdentifier(ctx);
+			fs = (FunctionSymbol) resolveScope(ctx).resolve(id);
+			functionRoot = fs.getAst();
+		} else {
+			return null;
+		}
+
 		JavaScriptParser.FunctionBodyContext body = functionRoot.getChild(
 				JavaScriptParser.FunctionBodyContext.class, 0);
 
@@ -103,13 +123,14 @@ public class ExpressionEvalVisitor extends
 
 		JavaScriptParser.ArgumentsContext args = ctx.getChild(
 				JavaScriptParser.ArgumentsContext.class, 0);
-		int argsCount = args.getChildCount() - 2;// - "(" ")"
+		// (arg,arg,arg) : argsCounts = (7-2)/2+1 = 3
+		int argsCount = (args.getChildCount() - 2) / 2 + 1;
 		int i = 0;
 		for (Symbol parameter : fs.getMembers().values()) {
 			if (i < argsCount) {
-				ParseTree argNode = args.getChild(i + 1);
+				ParseTree argNode = args.getChild(ArgumentContext.class,i);
 				EvalResult value = visit(argNode);
-				fspace.put(parameter.getName(), value.copy());
+				fspace.put(parameter.getName(), value.value());
 				i++;
 			}
 		}
@@ -198,18 +219,35 @@ public class ExpressionEvalVisitor extends
 		if ("+".equals(ctx.getChild(1).getText())) {
 			r = Operator.add(a, b);
 
-		} else {
+		} else if ("*".equals(ctx.getChild(1).getText())) {
+			r = Operator.multi(a, b);
+
+		} else if ("/".equals(ctx.getChild(1).getText())) {
+			r = Operator.divide(a, b);
+
+		} else if ("-".equals(ctx.getChild(1).getText())) {
 			r = Operator.minus(a, b);
+
+		} else if ("%".equals(ctx.getChild(1).getText())) {
+			r = Operator.mod(a, b);
 
 		}
 		log.debug("Additive:" + r);
 		return r;
+	}
 
+	/**
+	 * Async? Function '*'? '(' formalParameterList? ')' '{' functionBody '}'
+	 */
+	@Override
+	public EvalResult visitAnoymousFunctionDecl(AnoymousFunctionDeclContext ctx) {
+		return new EvalResult(EvalResultType.AST, ctx);
 	}
 
 	/**
 	 * singleExpression ('*' | '/' | '%') singleExpression
 	 */
+	@Override
 	public EvalResult visitMultiplicativeExpression(
 			MultiplicativeExpressionContext ctx) {
 
@@ -247,13 +285,22 @@ public class ExpressionEvalVisitor extends
 		}
 		if (tree instanceof ParserRuleContext) {
 			if (tree instanceof JavaScriptParser.NumericLiteralContext) {
-				String numberStr = tree.getChild(0).getText();
-				if (numberStr.contains(".")) {
-					r.setType(EvalResult.EvalResultType.FLOAT);
-					r.setValue(Float.valueOf(numberStr));
-				} else {
+				TerminalNode leaf = (TerminalNode) tree.getChild(0);
+				String numberStr = leaf.getText();
+				if (leaf.getSymbol().getType() == JavaScriptLexer.DecimalLiteral) {
+					if (numberStr.contains(".")) {
+						r.setType(EvalResult.EvalResultType.FLOAT);
+						r.setValue(Float.valueOf(numberStr));
+					} else {
+						r.setType(EvalResult.EvalResultType.LONG);
+						r.setValue(Long.valueOf(numberStr));
+					}
+				} else if (leaf.getSymbol().getType() == JavaScriptLexer.HexIntegerLiteral) {
 					r.setType(EvalResult.EvalResultType.LONG);
-					r.setValue(Long.valueOf(numberStr));
+					r.setValue(Long.valueOf(numberStr.substring(2), 16));
+					System.err.println(numberStr + ":" + r.getValue());
+				} else {
+
 				}
 			}
 		}
@@ -334,6 +381,33 @@ public class ExpressionEvalVisitor extends
 			JavaScriptParser.AssignmentExpressionContext ctx) {
 
 		return evalExpression(ctx);
+	}
+
+	/**
+	 * arrayLiteral : ('[' elementList ']') ;
+	 * 
+	 * elementList : ','* arrayElement? (','+ arrayElement)* ','* //
+	 * Yes,everything is optional ;
+	 * 
+	 * arrayElement : Ellipsis? singleExpression ;
+	 */
+	@Override
+	public EvalResult visitArrayLiteralExpression(
+			ArrayLiteralExpressionContext ctx) {
+		EvalResult er = new EvalResult();
+		ParserRuleContext elementListNode = (ParserRuleContext) ctx.getChild(0)
+				.getChild(1);
+		int size = elementListNode.getChildCount() / 2 + 1;
+		List<EvalResult> elements = new ArrayList<EvalResult>();
+		for (int i = 0; i < size; i++) {
+			EvalResult element = visit(elementListNode.getChild(
+					ArrayElementContext.class, i));
+			elements.add(element);
+		}
+		er.setType(EvalResultType.ARRAY);
+		er.setValue(elements);
+		log.debug(size + " elements in " + er.toString());
+		return er;
 	}
 
 	private MemorySpace getSpaceWithSymbol(String id) {

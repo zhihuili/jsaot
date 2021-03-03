@@ -3,7 +3,7 @@ package me.zhihui.jsaot.processor.expression;
 public class EvalResult implements Cloneable {
 
 	public enum EvalResultType {
-		LONG, FLOAT, STRING, BOOL
+		LONG, FLOAT, STRING, BOOL, ARRAY, AST
 	}
 
 	private EvalResultType type;
@@ -60,9 +60,13 @@ public class EvalResult implements Cloneable {
 		return (EvalResult) super.clone();
 	}
 
-	public EvalResult copy() {
+	public EvalResult value() {
 		try {
-			return clone();
+			if (type == EvalResultType.STRING || type == EvalResultType.LONG
+					|| type == EvalResultType.FLOAT)
+				return clone();
+			else
+				return this;
 		} catch (CloneNotSupportedException e) {
 			return null;
 		}
