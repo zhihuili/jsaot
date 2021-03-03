@@ -4,6 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 
+import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.ParseTreeProperty;
+import org.antlr.v4.runtime.tree.TerminalNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import me.zhihui.jsaot.parser.JavaScriptLexer;
 import me.zhihui.jsaot.parser.JavaScriptParser;
 import me.zhihui.jsaot.parser.JavaScriptParser.AnoymousFunctionDeclContext;
@@ -14,6 +21,7 @@ import me.zhihui.jsaot.parser.JavaScriptParser.AssignmentOperatorExpressionConte
 import me.zhihui.jsaot.parser.JavaScriptParser.FunctionExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.IdentifierExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.MultiplicativeExpressionContext;
+import me.zhihui.jsaot.parser.JavaScriptParser.NotExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.PostDecreaseExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.RelationalExpressionContext;
 import me.zhihui.jsaot.parser.JavaScriptParser.WhileStatementContext;
@@ -29,15 +37,7 @@ import me.zhihui.jsaot.symbol.MemorySpace;
 import me.zhihui.jsaot.symbol.Scope;
 import me.zhihui.jsaot.symbol.Symbol;
 
-import org.antlr.v4.runtime.ParserRuleContext;
-import org.antlr.v4.runtime.tree.ParseTree;
-import org.antlr.v4.runtime.tree.ParseTreeProperty;
-import org.antlr.v4.runtime.tree.TerminalNode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-public class ExpressionEvalVisitor extends
-		JavaScriptParserBaseVisitor<EvalResult> {
+public class ExpressionEvalVisitor extends JavaScriptParserBaseVisitor<EvalResult> {
 	Logger log = LoggerFactory.getLogger(ExpressionEvalVisitor.class);
 
 	ParseTreeProperty<Scope> scopes;
@@ -48,8 +48,7 @@ public class ExpressionEvalVisitor extends
 	Stack<FunctionSpace> stack = new Stack<FunctionSpace>();
 	public static final ReturnValue sharedReturnValue = new ReturnValue();
 
-	public ExpressionEvalVisitor(ParseTreeProperty<Scope> scopes,
-			GlobalScope globals, MemorySpace globalSpace) {
+	public ExpressionEvalVisitor(ParseTreeProperty<Scope> scopes, GlobalScope globals, MemorySpace globalSpace) {
 		this.scopes = scopes;
 		this.globals = globals;
 		currentScope = globals;
@@ -58,8 +57,7 @@ public class ExpressionEvalVisitor extends
 	}
 
 	@Override
-	public EvalResult visitVariableDeclaration(
-			JavaScriptParser.VariableDeclarationContext ctx) {
+	public EvalResult visitVariableDeclaration(JavaScriptParser.VariableDeclarationContext ctx) {
 		return evalExpression(ctx);
 	}
 
@@ -98,8 +96,7 @@ public class ExpressionEvalVisitor extends
 	 * singleExpression arguments # ArgumentsExpression
 	 */
 	@Override
-	public EvalResult visitArgumentsExpression(
-			JavaScriptParser.ArgumentsExpressionContext ctx) {
+	public EvalResult visitArgumentsExpression(JavaScriptParser.ArgumentsExpressionContext ctx) {
 		ParserRuleContext left = (ParserRuleContext) ctx.getChild(0);
 		FunctionSymbol fs = null;
 		ParserRuleContext functionRoot = null;
@@ -114,21 +111,20 @@ public class ExpressionEvalVisitor extends
 			return null;
 		}
 
-		JavaScriptParser.FunctionBodyContext body = functionRoot.getChild(
-				JavaScriptParser.FunctionBodyContext.class, 0);
+		JavaScriptParser.FunctionBodyContext body = functionRoot.getChild(JavaScriptParser.FunctionBodyContext.class,
+				0);
 
 		FunctionSpace fspace = new FunctionSpace(fs);
 		MemorySpace saveSpace = currentSpace;
 		currentSpace = fspace;
 
-		JavaScriptParser.ArgumentsContext args = ctx.getChild(
-				JavaScriptParser.ArgumentsContext.class, 0);
+		JavaScriptParser.ArgumentsContext args = ctx.getChild(JavaScriptParser.ArgumentsContext.class, 0);
 		// (arg,arg,arg) : argsCounts = (7-2)/2+1 = 3
 		int argsCount = (args.getChildCount() - 2) / 2 + 1;
 		int i = 0;
 		for (Symbol parameter : fs.getMembers().values()) {
 			if (i < argsCount) {
-				ParseTree argNode = args.getChild(ArgumentContext.class,i);
+				ParseTree argNode = args.getChild(ArgumentContext.class, i);
 				EvalResult value = visit(argNode);
 				fspace.put(parameter.getName(), value.value());
 				i++;
@@ -161,8 +157,7 @@ public class ExpressionEvalVisitor extends
 	 * return by throw error
 	 */
 	@Override
-	public EvalResult visitReturnStatement(
-			JavaScriptParser.ReturnStatementContext ctx) {
+	public EvalResult visitReturnStatement(JavaScriptParser.ReturnStatementContext ctx) {
 		sharedReturnValue.value = visit(ctx.getChild(1));
 		throw sharedReturnValue;
 	}
@@ -181,8 +176,7 @@ public class ExpressionEvalVisitor extends
 		boolean cond = condition(node);
 		EvalResult er;
 		if (cond) {
-			JavaScriptParser.StatementContext statNode = node.getChild(
-					JavaScriptParser.StatementContext.class, 0);
+			JavaScriptParser.StatementContext statNode = node.getChild(JavaScriptParser.StatementContext.class, 0);
 			er = visit(statNode);
 			return er == null ? new EvalResult() : er;
 		}
@@ -190,14 +184,23 @@ public class ExpressionEvalVisitor extends
 	}
 
 	private boolean condition(ParserRuleContext node) {
-		JavaScriptParser.ExpressionSequenceContext boolExpNode = node.getChild(
-				JavaScriptParser.ExpressionSequenceContext.class, 0);
+		JavaScriptParser.ExpressionSequenceContext boolExpNode = node
+				.getChild(JavaScriptParser.ExpressionSequenceContext.class, 0);
 		return (Boolean) visit(boolExpNode).getValue();
 	}
 
-/**
- * singleExpression ('<' | '>' | '<=' | '>=') singleExpression 
- */
+	/**
+	 * '!' singleExpression
+	 */
+	@Override
+	public EvalResult visitNotExpression(NotExpressionContext ctx) {
+		EvalResult right = visit(ctx.getChild(1));
+		return Operator.not(right);
+	}
+
+	/**
+	 * singleExpression ('<' | '>' | '<=' | '>=') singleExpression
+	 */
 	@Override
 	public EvalResult visitRelationalExpression(RelationalExpressionContext ctx) {
 		EvalResult a = visit(ctx.getChild(0));
@@ -210,8 +213,7 @@ public class ExpressionEvalVisitor extends
 	 * singleExpression ('+' | '-') singleExpression
 	 */
 	@Override
-	public EvalResult visitAdditiveExpression(
-			JavaScriptParser.AdditiveExpressionContext ctx) {
+	public EvalResult visitAdditiveExpression(JavaScriptParser.AdditiveExpressionContext ctx) {
 
 		EvalResult a = visit(ctx.getChild(0));
 		EvalResult b = visit(ctx.getChild(2));
@@ -248,8 +250,7 @@ public class ExpressionEvalVisitor extends
 	 * singleExpression ('*' | '/' | '%') singleExpression
 	 */
 	@Override
-	public EvalResult visitMultiplicativeExpression(
-			MultiplicativeExpressionContext ctx) {
+	public EvalResult visitMultiplicativeExpression(MultiplicativeExpressionContext ctx) {
 
 		EvalResult a = visit(ctx.getChild(0));
 		EvalResult b = visit(ctx.getChild(2));
@@ -298,7 +299,6 @@ public class ExpressionEvalVisitor extends
 				} else if (leaf.getSymbol().getType() == JavaScriptLexer.HexIntegerLiteral) {
 					r.setType(EvalResult.EvalResultType.LONG);
 					r.setValue(Long.valueOf(numberStr.substring(2), 16));
-					System.err.println(numberStr + ":" + r.getValue());
 				} else {
 
 				}
@@ -309,8 +309,7 @@ public class ExpressionEvalVisitor extends
 	}
 
 	@Override
-	public EvalResult visitFunctionDeclaration(
-			JavaScriptParser.FunctionDeclarationContext ctx) {
+	public EvalResult visitFunctionDeclaration(JavaScriptParser.FunctionDeclarationContext ctx) {
 		return null;
 	}
 
@@ -330,8 +329,7 @@ public class ExpressionEvalVisitor extends
 	 * singleExpression {this.notLineTerminator()}? '--'
 	 */
 	@Override
-	public EvalResult visitPostDecreaseExpression(
-			PostDecreaseExpressionContext ctx) {
+	public EvalResult visitPostDecreaseExpression(PostDecreaseExpressionContext ctx) {
 		String id = getIdentifier(ctx);
 		if (id == null) {
 			return null;
@@ -347,21 +345,16 @@ public class ExpressionEvalVisitor extends
 	 * <assoc=right> singleExpression assignmentOperator singleExpression
 	 */
 	@Override
-	public EvalResult visitAssignmentOperatorExpression(
-			AssignmentOperatorExpressionContext ctx) {
+	public EvalResult visitAssignmentOperatorExpression(AssignmentOperatorExpressionContext ctx) {
 		String id = getIdentifier(ctx);
 		if (id == null)
 			return null;
 		String op = ctx.getChild(1).getText();
 		switch (op) {
 		case "*=":
-			currentSpace.put(
-					id,
-					Operator.multi(visit(ctx.getChild(0)),
-							visit(ctx.getChild(2))));
+			currentSpace.put(id, Operator.multi(visit(ctx.getChild(0)), visit(ctx.getChild(2))));
 		case "+=":
-			currentSpace.put(id, Operator.add(visit(ctx.getChild(0)),
-					visit(ctx.getChild(2))));
+			currentSpace.put(id, Operator.add(visit(ctx.getChild(0)), visit(ctx.getChild(2))));
 		}
 		return null;
 	}
@@ -377,8 +370,7 @@ public class ExpressionEvalVisitor extends
 	}
 
 	@Override
-	public EvalResult visitAssignmentExpression(
-			JavaScriptParser.AssignmentExpressionContext ctx) {
+	public EvalResult visitAssignmentExpression(JavaScriptParser.AssignmentExpressionContext ctx) {
 
 		return evalExpression(ctx);
 	}
@@ -386,27 +378,27 @@ public class ExpressionEvalVisitor extends
 	/**
 	 * arrayLiteral : ('[' elementList ']') ;
 	 * 
-	 * elementList : ','* arrayElement? (','+ arrayElement)* ','* //
-	 * Yes,everything is optional ;
+	 * elementList : ','* arrayElement? (','+ arrayElement)* ','* // Yes,everything
+	 * is optional ;
 	 * 
 	 * arrayElement : Ellipsis? singleExpression ;
 	 */
 	@Override
-	public EvalResult visitArrayLiteralExpression(
-			ArrayLiteralExpressionContext ctx) {
+	public EvalResult visitArrayLiteralExpression(ArrayLiteralExpressionContext ctx) {
 		EvalResult er = new EvalResult();
-		ParserRuleContext elementListNode = (ParserRuleContext) ctx.getChild(0)
-				.getChild(1);
-		int size = elementListNode.getChildCount() / 2 + 1;
+		ParserRuleContext elementListNode = (ParserRuleContext) ctx.getChild(0).getChild(1);
+		int count = elementListNode.getChildCount();
 		List<EvalResult> elements = new ArrayList<EvalResult>();
-		for (int i = 0; i < size; i++) {
-			EvalResult element = visit(elementListNode.getChild(
-					ArrayElementContext.class, i));
-			elements.add(element);
+		if (count > 0) {
+			int size = count / 2 + 1;// e,e,e => (5/2 +1 =3)
+			for (int i = 0; i < size; i++) {
+				EvalResult element = visit(elementListNode.getChild(ArrayElementContext.class, i));
+				elements.add(element);
+			}
 		}
 		er.setType(EvalResultType.ARRAY);
 		er.setValue(elements);
-		log.debug(size + " elements in " + er.toString());
+		log.debug(elements.size() + " elements in " + er.toString());
 		return er;
 	}
 

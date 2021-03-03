@@ -28,7 +28,7 @@ public class App {
 
 	public static void main(String[] args) throws IOException {
 		String inputFile = App.class.getClassLoader()
-				.getResource("sample/3.js").getPath();
+				.getResource("sample/2.js").getPath();
 		if (args.length > 0)
 			inputFile = args[0];
 		InputStream is = new FileInputStream(inputFile);
