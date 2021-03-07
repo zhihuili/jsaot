@@ -65,7 +65,8 @@ public class ExpressionEvalVisitor extends JavaScriptParserBaseVisitor<EvalResul
 		String variableName = getIdentifier(ctx);
 		if (variableName != null) {
 			EvalResult r = visit(ctx.getChild(2));// ctx.getChild(1) is "="
-			storeMemory(variableName, r.value());
+			if (r != null)
+				storeMemory(variableName, r.value());
 		}
 		return null;
 	}
@@ -106,6 +107,9 @@ public class ExpressionEvalVisitor extends JavaScriptParserBaseVisitor<EvalResul
 		} else if (left instanceof IdentifierExpressionContext) {
 			String id = getIdentifier(ctx);
 			fs = (FunctionSymbol) resolveScope(ctx).resolve(id);
+			if (fs == null) {
+				return null;
+			}
 			functionRoot = fs.getAst();
 		} else {
 			return null;
@@ -186,7 +190,11 @@ public class ExpressionEvalVisitor extends JavaScriptParserBaseVisitor<EvalResul
 	private boolean condition(ParserRuleContext node) {
 		JavaScriptParser.ExpressionSequenceContext boolExpNode = node
 				.getChild(JavaScriptParser.ExpressionSequenceContext.class, 0);
-		return (Boolean) visit(boolExpNode).getValue();
+		EvalResult er = visit(boolExpNode);
+		if (er.getType() == EvalResultType.BOOL)
+			return (Boolean) er.getValue();
+		else
+			return true;// TODO for 2.js
 	}
 
 	/**

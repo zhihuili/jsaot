@@ -4,6 +4,9 @@ import me.zhihui.jsaot.processor.expression.EvalResult.EvalResultType;
 
 public class Operator {
 	public static EvalResult add(EvalResult a, EvalResult b) {
+		if (a == null || b == null) {
+			return null;
+		}
 		EvalResult result = new EvalResult();
 		if (a.getType() == EvalResult.EvalResultType.STRING || b.getType() == EvalResult.EvalResultType.STRING) {
 			result.setType(EvalResult.EvalResultType.STRING);
@@ -21,6 +24,9 @@ public class Operator {
 	}
 
 	public static EvalResult minus(EvalResult a, EvalResult b) {
+		if (a == null || b == null) {
+			return null;
+		}
 		EvalResult result = new EvalResult();
 		if (a.getType() == EvalResult.EvalResultType.FLOAT || b.getType() == EvalResult.EvalResultType.FLOAT) {
 			result.setType(EvalResult.EvalResultType.FLOAT);
@@ -34,6 +40,9 @@ public class Operator {
 	}
 
 	public static EvalResult multi(EvalResult a, EvalResult b) {
+		if (a == null || b == null) {
+			return null;
+		}
 		EvalResult result = new EvalResult();
 		if (a.getType() == EvalResult.EvalResultType.FLOAT || b.getType() == EvalResult.EvalResultType.FLOAT) {
 			result.setType(EvalResult.EvalResultType.FLOAT);

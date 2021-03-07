@@ -28,7 +28,7 @@ public class App {
 
 	public static void main(String[] args) throws IOException {
 		String inputFile = App.class.getClassLoader()
-				.getResource("sample/2.js").getPath();
+				.getResource("sample/3.js").getPath();
 		if (args.length > 0)
 			inputFile = args[0];
 		InputStream is = new FileInputStream(inputFile);
@@ -41,7 +41,7 @@ public class App {
 		JavaScriptParser parser = new JavaScriptParser(tokenStream);
 		ProgramContext root = parser.program();
 
-		// Trees.inspect(root, parser);
+//		 Trees.inspect(root, parser);
 
 		ParseTreeWalker walker = new ParseTreeWalker();
 		ParseTreeProperty<Scope> scopes = new ParseTreeProperty<Scope>();
@@ -50,7 +50,7 @@ public class App {
 		DeclProcessor def = new DeclProcessor(scopes, globals);
 		walker.walk(def, root);
 		printLine();
-
+//
 		ExpressionEvalVisitor evalVisitor = new ExpressionEvalVisitor(scopes,
 				globals, globalSpace);
 		evalVisitor.visit(root);
