@@ -118,7 +118,7 @@ public class Operator {
 		}
 		if (er.getType() == EvalResultType.STRING) {
 			String value = (String) er.getValue();
-			if (value.isBlank())
+			if (value.isEmpty())
 				return false;
 			return true;
 		}
